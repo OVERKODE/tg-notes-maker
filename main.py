@@ -1,115 +1,101 @@
-anyio==4.9.0
-argcomplete==3.6.2
-attrs==25.1.0
-beautifulsoup4==4.13.4
-bitarray==3.4.2
-blivet==3.12.1
-blivet-gui==2.6.0
-boto3==1.38.27
-botocore==1.38.27
-Brlapi==0.8.6
-certifi==2024.8.30
-cffi==1.17.1
-charset-normalizer==3.4.1
-click==8.1.7
-contourpy==1.3.2
-crypt_r==3.13.1
-cupshelpers==1.0
-cycler==0.12.1
-Cython==3.0.12
-dasbus==1.7
-dbus-python==1.3.2
-dbus_next==0.2.3
-distro==1.9.0
-dnf==4.23.0
-fedora-third-party==0.10
-file-magic==0.4.0
-fonttools==4.58.1
-h11==0.16.0
-httpcore==1.0.9
-httpx==0.28.1
-humanize==4.12.0
-idna==3.10
-initial-setup==0.3.101
-iso639==0.1.4
-jmespath==1.0.1
-jsonschema==4.23.0
-jsonschema-specifications==2024.10.1
-kiwisolver==1.4.8
-langtable==0.0.68
-libcomps==0.1.21
-libdnf==0.74.0
-louis==3.33.0
-lxml==5.3.2
-matplotlib==3.10.3
-nftables==0.1
-numexpr==2.10.2
-numpy==2.2.6
-olefile==0.47
-packaging==24.2
-pandas==2.2.3
-perf==0.1
-pexpect==4.9.0
-pid==2.2.3
-pillow==11.1.0
-ply==3.11
-productmd==1.45
-psutil==6.1.1
-ptyprocess==0.7.0
-pwquality==1.4.5
-pycairo==1.25.1
-pycparser==2.20
-pycups==2.0.4
-pyenchant==3.2.2
-pygdbmi==0.11.0.0
-PyGObject==3.50.0
-pyinotify==0.9.6
-pykickstart==3.62
-PyNaCl==1.5.0
-pyparsing==3.2.3
-pyparted==3.13.0
-pyproj==3.7.0
-PySocks==1.7.1
-pyTelegramBotAPI==4.27.0
-python-augeas==1.1.0
-python-dateutil==2.8.2
-python-linux-procfs==0.7.3
-python-meh==0.52
-python-telegram-bot==22.1
-pytube==15.0.0
-pytz==2025.2
-pyudev==0.24.3
-pyxdg==0.27
-PyYAML==6.0.2
-pyynl @ file:///builddir/build/BUILD/kernel-6.14.9-build/kernel-6.14.9/linux-6.14.9-300.fc42.x86_64/tools/net/ynl
-RapidFuzz==3.11.0
-referencing==0.36.2
-regex==2024.11.6
-requests==2.32.3
-requests-file==2.0.0
-requests-ftp==0.3.1
-rpds-py==0.25.0
-rpm==4.20.1
-s3transfer==0.13.0
-selinux @ file:///builddir/build/BUILD/libselinux-3.8-build/libselinux-3.8/src
-sentry-sdk==2.21.0
-sepolicy @ file:///builddir/build/BUILD/policycoreutils-3.8-build/selinux-3.8/python/sepolicy
-setools==4.5.1
-setroubleshoot @ file:///builddir/build/BUILD/setroubleshoot-3.3.35-build/setroubleshoot-3.3.35/src
-setuptools==74.1.3
-simpleaudio==1.0.4
-simpleline==1.9.0
-six==1.17.0
-sniffio==1.3.1
-sos==4.9.1
-soupsieve==2.7
-systemd-python==235
-telebot==0.0.5
-telegram==0.0.1
-ton-client-py==1.44.3.0
-tonsdk==1.0.15
-typing_extensions==4.12.2
-tzdata==2025.2
-urllib3==2.3.0
-xkbregistry==0.3
-zstandard==0.23.0
+import telebot
+from telebot import types
+import sqlite3 # import essentials
+
+connection = sqlite3.connect('data.db', check_same_thread=False) # connecting to database
+cursor = connection.cursor() # create a cursor for database
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS data (
+    user_id INTEGER,
+    note TEXT
+)
+''') # create a database
+connection.commit() # commit changes
+
+API = '' # YOUR API-token for bot
+bot = telebot.TeleBot(API) # create a bot class
+
+@bot.message_handler(commands=['start'])
+def start(message): # start function
+    check_user_id(message.from_user.id)
+    bot.send_message(message.from_user.id, f"👋 Hi, {message.from_user.first_name} {message.from_user.last_name}!\nThere you can make a note for yourself")
+    main(message) 
+
+def main(message): # main menu function 
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    button_actual_note = types.KeyboardButton("My note 📄")
+    button_create_note = types.KeyboardButton("Create task 💼")
+    markup.add(button_actual_note, button_create_note)
+
+    bot.send_message(message.from_user.id, "Choose the action:", reply_markup=markup)
+    bot.register_next_step_handler(message, user_choice)
+
+def user_choice(message): # function where is checking the user's choice
+    answer = message.text
+    
+    if answer == "My note 📄":
+        get_user_task(message, message.from_user.id)
+    else:
+        bot_takes_user_note(message, message.from_user.id)
+    
+def check_user_note(user_id): # function checks if user has any notes (True if yes, False if not)
+    cursor.execute('SELECT note FROM data WHERE user_id=?', (user_id,))
+    result = cursor.fetchone()
+    if result[0] is None:
+        return False
+    else:
+        return True
+
+def update_user_note(message, user_id): # Updating user's note
+    user_note = message.text
+    check_result = check_user_note(user_id)
+    
+    if check_result == True:
+        bot.send_message(user_id, "At first, complete your previous task.")
+        main(message)
+    else:
+        cursor.execute('UPDATE data SET note=? WHERE user_id=?', (user_note, user_id,))
+        connection.commit()
+        bot.send_message(user_id, "✅ Successful!")
+        main(message)
+
+def bot_takes_user_note(message, user_id):
+    bot.send_message(user_id, "✍️ Send me your note:")
+    bot.register_next_step_handler(message, lambda m: update_user_note(m, user_id))
+
+def action_with_task(message, user_id): # If user completed task, then bot delete his note. If not, then bot doesn't delete it
+    answer = message.text
+
+    if answer == "Yes ✅":
+        cursor.execute('UPDATE data SET note=? WHERE user_id=?', (None, user_id,))
+        connection.commit()
+
+        bot.send_message(user_id, "Good job! See you later! 🚀")
+        main(message)
+    else:
+        bot.send_message(user_id, "Good luck with it! 🚀")
+        main(message)
+
+def get_user_task(message, user_id): # function for checking user's note
+    cursor.execute('SELECT note FROM data WHERE user_id=?', (user_id,))
+    result = cursor.fetchone()
+    if result[0] is None:
+        bot.send_message(user_id, "❌ You don't have any notes yet.")
+        main(message)
+    if result[0] is not None:
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        button_yes = types.KeyboardButton("Yes ✅")
+        button_no = types.KeyboardButton("No ❌")
+        markup.add(button_yes, button_no)
+        bot.send_message(user_id, f"📄 Your actual note:\n\n{result[0]}\n\nHave you done this task?", reply_markup=markup)
+        bot.register_next_step_handler(message, lambda m: action_with_task(m, user_id))
+
+def check_user_id(user_id): # function for checking user id
+    cursor.execute('SELECT * FROM data WHERE user_id=?', (user_id,))
+    result = cursor.fetchone()
+    if result is None:
+        cursor.execute('INSERT INTO data (user_id) VALUES (?)', (user_id,))
+        connection.commit()
+   
+bot.polling() # compile bot
